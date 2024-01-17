@@ -1,5 +1,10 @@
 # n - The Funky Package Manager Executor
 
+**Disclaimer:**
+Everything in this repo is written by chat gpt except this disclaimer :)
+
+---
+
 Welcome to `n`, the coolest, slickest, and most convenient command-line tool for all your package management needs! Whether you're juggling `npm`, `yarn`, `pnpm`, or `bun`, `n` has got your back. It's like your personal DJ, mixing and matching commands for the right package manager. 🎧🚀
 
 ## Getting Started
