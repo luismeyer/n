@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::process::Command as ProcessCommand;
+use dialoguer::Select;
 
 fn main() {
     // Collecting all arguments except for the first one (which is the program name)
@@ -10,7 +11,7 @@ fn main() {
 
     match detect_package_manager(&current_dir) {
         Some(manager) => run_command(&manager, &args),
-        None => println!("No package manager detected."),
+        None => handle_no_package_manager(&args),
     }
 }
 
@@ -174,6 +175,48 @@ fn patch_bun_command(cmd: &str) -> Vec<String> {
         "ls" => vec!["list".to_string()],
         _ => vec![cmd.to_string()],
     }
+}
+
+fn handle_no_package_manager(args: &[String]) {
+    let options = vec!["pnpm","bun","npm", "yarn"];
+    
+    let selection = Select::new()
+        .with_prompt("No package manager detected. Please select one:")
+        .items(&options)
+        .default(0)
+        .interact()
+        .expect("Failed to get selection");
+    
+    let manager = options[selection];
+    println!("Selected: {}", manager);
+
+    // Check if the original command is already an install command
+    if is_install_command(args) {
+        // If it's already an install command, just run it once
+        println!("Running install command to initialize project and install packages...");
+        run_command(manager, args);
+    } else {
+        // If it's not an install command, first initialize with install, then run the original command
+        println!("Initializing project with {}...", manager);
+        let init_args = vec!["install".to_string()];
+        run_command(manager, &init_args);
+        
+        if !args.is_empty() {
+            println!("Running original command...");
+            run_command(manager, args);
+        }
+    }
+}
+
+fn is_install_command(args: &[String]) -> bool {
+    if args.is_empty() {
+        return false;
+    }
+    
+    let first_arg = &args[0];
+    
+    // Check if it's an install command or shorthand that maps to install
+    matches!(first_arg.as_str(), "install" | "i" | "add" | "a")
 }
 
 #[cfg(test)]
@@ -421,5 +464,38 @@ mod tests {
             let result = patch_commands("npm", &vec![shortcut.to_string()]);
             assert_eq!(result, expected);
         }
+    }
+
+    #[test]
+    fn test_is_install_command_true_cases() {
+        assert!(is_install_command(&vec!["install".to_string()]));
+        assert!(is_install_command(&vec!["i".to_string()]));
+        assert!(is_install_command(&vec!["add".to_string()]));
+        assert!(is_install_command(&vec!["a".to_string()]));
+        assert!(is_install_command(&vec!["i".to_string(), "lodash".to_string()]));
+        assert!(is_install_command(&vec!["add".to_string(), "react".to_string(), "--save-dev".to_string()]));
+    }
+
+    #[test]
+    fn test_is_install_command_false_cases() {
+        assert!(!is_install_command(&vec![]));
+        assert!(!is_install_command(&vec!["build".to_string()]));
+        assert!(!is_install_command(&vec!["dev".to_string()]));
+        assert!(!is_install_command(&vec!["test".to_string()]));
+        assert!(!is_install_command(&vec!["start".to_string()]));
+        assert!(!is_install_command(&vec!["remove".to_string(), "lodash".to_string()]));
+        assert!(!is_install_command(&vec!["uninstall".to_string(), "react".to_string()]));
+    }
+
+    #[test]
+    fn test_is_install_command_with_shortcuts() {
+        // Test that shortcuts that map to install commands are detected
+        assert!(is_install_command(&vec!["i".to_string()])); // maps to install
+        assert!(is_install_command(&vec!["a".to_string()])); // maps to add/install
+        
+        // Test that other shortcuts are not detected as install commands
+        assert!(!is_install_command(&vec!["r".to_string()])); // maps to remove/uninstall
+        assert!(!is_install_command(&vec!["d".to_string()])); // maps to dev
+        assert!(!is_install_command(&vec!["b".to_string()])); // maps to build
     }
 }
