@@ -64,13 +64,115 @@ fn check_directory_for_package_manager(dir: &std::path::Path) -> Option<String> 
 }
 
 fn run_command(manager: &str, args: &[String]) {
+    let patched_args = patch_commands(manager, args);
+    
     let status = ProcessCommand::new(manager)
-        .args(args)
+        .args(patched_args)
         .status()
         .expect("Failed to execute command");
 
     if !status.success() {
         eprintln!("Command failed to execute");
+    }
+}
+
+fn patch_commands(manager: &str, args: &[String]) -> Vec<String> {
+    if args.is_empty() {
+        return args.to_vec();
+    }
+
+    let mut result = Vec::new();
+    
+    // Get the first argument (the command to potentially patch)
+    let first_arg = &args[0];
+    
+    // Apply command patching based on the package manager
+    let patched_command = match manager {
+        "npm" => patch_npm_command(first_arg),
+        "yarn" => patch_yarn_command(first_arg),
+        "pnpm" => patch_pnpm_command(first_arg),
+        "bun" => patch_bun_command(first_arg),
+        _ => vec![first_arg.clone()],
+    };
+    
+    // Add the patched command(s)
+    result.extend(patched_command);
+    
+    // Add the remaining arguments
+    if args.len() > 1 {
+        result.extend_from_slice(&args[1..]);
+    }
+    
+    result
+}
+
+fn patch_npm_command(cmd: &str) -> Vec<String> {
+    match cmd {
+        "i" => vec!["install".to_string()],
+        "a" => vec!["install".to_string()], // npm doesn't have 'add', use 'install'
+        "r" => vec!["uninstall".to_string()],
+        "rm" => vec!["uninstall".to_string()],
+        "d" => vec!["run".to_string(), "dev".to_string()],
+        "dev" => vec!["run".to_string(), "dev".to_string()],
+        "b" => vec!["run".to_string(), "build".to_string()],
+        "build" => vec!["run".to_string(), "build".to_string()],
+        "s" => vec!["start".to_string()],
+        "t" => vec!["test".to_string()],
+        "up" => vec!["update".to_string()],
+        "ls" => vec!["list".to_string()],
+        _ => vec![cmd.to_string()],
+    }
+}
+
+fn patch_yarn_command(cmd: &str) -> Vec<String> {
+    match cmd {
+        "i" => vec!["install".to_string()],
+        "a" => vec!["add".to_string()],
+        "r" => vec!["remove".to_string()],
+        "rm" => vec!["remove".to_string()],
+        "d" => vec!["dev".to_string()],
+        "b" => vec!["build".to_string()],
+        "s" => vec!["start".to_string()],
+        "t" => vec!["test".to_string()],
+        "up" => vec!["upgrade".to_string()],
+        "ls" => vec!["list".to_string()],
+        _ => vec![cmd.to_string()],
+    }
+}
+
+fn patch_pnpm_command(cmd: &str) -> Vec<String> {
+    match cmd {
+        "i" => vec!["install".to_string()],
+        "a" => vec!["add".to_string()],
+        "r" => vec!["remove".to_string()],
+        "rm" => vec!["remove".to_string()],
+        "d" => vec!["run".to_string(), "dev".to_string()],
+        "dev" => vec!["run".to_string(), "dev".to_string()],
+        "b" => vec!["run".to_string(), "build".to_string()],
+        "build" => vec!["run".to_string(), "build".to_string()],
+        "s" => vec!["start".to_string()],
+        "t" => vec!["test".to_string()],
+        "up" => vec!["update".to_string()],
+        "ls" => vec!["list".to_string()],
+        _ => vec![cmd.to_string()],
+    }
+}
+
+fn patch_bun_command(cmd: &str) -> Vec<String> {
+    match cmd {
+        "i" => vec!["install".to_string()],
+        "a" => vec!["add".to_string()],
+        "r" => vec!["remove".to_string()],
+        "rm" => vec!["remove".to_string()],
+        "d" => vec!["run".to_string(), "dev".to_string()],
+        "dev" => vec!["run".to_string(), "dev".to_string()],
+        "b" => vec!["run".to_string(), "build".to_string()],
+        "build" => vec!["run".to_string(), "build".to_string()],
+        "s" => vec!["start".to_string()],
+        "t" => vec!["test".to_string()],
+        "up" => vec!["update".to_string()],
+        "ls" => vec!["list".to_string()],
+        _ => vec![cmd.to_string()],
     }
 }
 
@@ -216,5 +318,108 @@ mod tests {
         // Test detection from deep directory - should find it
         let result = detect_package_manager(&current_path);
         assert_eq!(result, Some("bun".to_string()));
+    }
+
+    #[test]
+    fn test_patch_commands_npm_install() {
+        let args = vec!["i".to_string(), "lodash".to_string()];
+        let result = patch_commands("npm", &args);
+        assert_eq!(result, vec!["install", "lodash"]);
+    }
+
+    #[test]
+    fn test_patch_commands_npm_run_dev() {
+        let args = vec!["d".to_string()];
+        let result = patch_commands("npm", &args);
+        assert_eq!(result, vec!["run", "dev"]);
+    }
+
+    #[test]
+    fn test_patch_commands_yarn_add() {
+        let args = vec!["a".to_string(), "react".to_string()];
+        let result = patch_commands("yarn", &args);
+        assert_eq!(result, vec!["add", "react"]);
+    }
+
+    #[test]
+    fn test_patch_commands_pnpm_remove() {
+        let args = vec!["r".to_string(), "lodash".to_string()];
+        let result = patch_commands("pnpm", &args);
+        assert_eq!(result, vec!["remove", "lodash"]);
+    }
+
+    #[test]
+    fn test_patch_commands_bun_build() {
+        let args = vec!["b".to_string()];
+        let result = patch_commands("bun", &args);
+        assert_eq!(result, vec!["run", "build"]);
+    }
+
+    #[test]
+    fn test_patch_commands_no_patching_needed() {
+        let args = vec!["install".to_string(), "lodash".to_string()];
+        let result = patch_commands("npm", &args);
+        assert_eq!(result, vec!["install", "lodash"]);
+    }
+
+    #[test]
+    fn test_patch_commands_unknown_manager() {
+        let args = vec!["i".to_string(), "lodash".to_string()];
+        let result = patch_commands("unknown", &args);
+        assert_eq!(result, vec!["i", "lodash"]);
+    }
+
+    #[test]
+    fn test_patch_commands_empty_args() {
+        let args: Vec<String> = vec![];
+        let result = patch_commands("npm", &args);
+        assert_eq!(result, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_patch_commands_preserves_additional_args() {
+        let args = vec!["i".to_string(), "lodash".to_string(), "--save-dev".to_string()];
+        let result = patch_commands("npm", &args);
+        assert_eq!(result, vec!["install", "lodash", "--save-dev"]);
+    }
+
+    #[test]
+    fn test_patch_npm_vs_yarn_add_command() {
+        // npm doesn't have 'add', should map 'a' to 'install'
+        let npm_result = patch_commands("npm", &vec!["a".to_string(), "lodash".to_string()]);
+        assert_eq!(npm_result, vec!["install", "lodash"]);
+        
+        // yarn has 'add', should map 'a' to 'add'
+        let yarn_result = patch_commands("yarn", &vec!["a".to_string(), "lodash".to_string()]);
+        assert_eq!(yarn_result, vec!["add", "lodash"]);
+    }
+
+    #[test]
+    fn test_patch_commands_yarn_dev_vs_npm_run_dev() {
+        // yarn can run dev directly
+        let yarn_result = patch_commands("yarn", &vec!["d".to_string()]);
+        assert_eq!(yarn_result, vec!["dev"]);
+        
+        // npm needs 'run dev'
+        let npm_result = patch_commands("npm", &vec!["d".to_string()]);
+        assert_eq!(npm_result, vec!["run", "dev"]);
+    }
+
+    #[test]
+    fn test_patch_commands_all_shortcuts() {
+        let shortcuts = vec![
+            ("i", vec!["install"]),
+            ("r", vec!["uninstall"]),
+            ("rm", vec!["uninstall"]),
+            ("s", vec!["start"]),
+            ("t", vec!["test"]),
+            ("up", vec!["update"]),
+            ("ls", vec!["list"]),
+        ];
+
+        for (shortcut, expected) in shortcuts {
+            let result = patch_commands("npm", &vec![shortcut.to_string()]);
+            assert_eq!(result, expected);
+        }
     }
 }
