@@ -51,7 +51,7 @@ fn check_directory_for_package_manager(dir: &std::path::Path) -> Option<String> 
                 return Some("yarn".to_string());
             }
 
-            if path.ends_with("bun.lockb") {
+            if path.ends_with("bun.lockb") || path.ends_with("bun.lock") {
                 return Some("bun".to_string());
             }
 
